@@ -86,6 +86,12 @@ contract Strategy is BaseStrategy {
         return "StrategystETHAccumulator";
     }
 
+    // We are purposely treating stETH and ETH as being equivalent. 
+    // This is for a few reasons. The main one is that we do not have a good way to value stETH at any current time without creating exploit routes.
+    // Currently you can mint eth for steth but can't burn steth for eth so need to sell. Once eth 2.0 is merged you will be able to burn 1-1 as well.
+    // The main downside here is that we will noramlly overvalue our position as we expect stETH to trade slightly below peg.
+    // That means we will earn profit on deposits and take losses on withdrawals.
+    // This may sound scary but it is the equivalent of using virtualprice in a curve lp. As we have seen from many exploits, virtual pricing is safer than touch pricing.
     function estimatedTotalAssets() public override view returns (uint256) {
         return stethBalance().add(wantBalance());
     }
