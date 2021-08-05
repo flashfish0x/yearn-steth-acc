@@ -39,6 +39,9 @@ contract Strategy is BaseStrategy {
     uint256 public constant DENOMINATOR = 10_000;
     uint256 public slippageProtectionOut;// = 50; //out of 10000. 50 = 0.5%
 
+    int128 private constant WETHID = 0;
+    int128 private constant STETHID = 1;
+
 
     constructor(address _vault) public BaseStrategy(_vault) {
         // You can set these parameters on deployment to whatever you want
@@ -46,7 +49,7 @@ contract Strategy is BaseStrategy {
         profitFactor = 2000;
         debtThreshold = 400*1e18;
 
-        stETH.approve(address(StableSwapSTETH), uint256(-1));
+        stETH.approve(address(StableSwapSTETH), type(uint256).max);
         
         maxSingleTrade = 1_000 * 1e18;
         slippageProtectionOut = 50;
@@ -59,10 +62,10 @@ contract Strategy is BaseStrategy {
     function updateReferal(address _referal) public onlyEmergencyAuthorized {
         referal = _referal;
     }
-    function updateMaxSingleTrade(uint256 _maxSingleTrade) public onlyEmergencyAuthorized {
+    function updateMaxSingleTrade(uint256 _maxSingleTrade) public onlyVaultManagers {
         maxSingleTrade = _maxSingleTrade;
     }
-    function updateSlippageProtectionOut(uint256 _slippageProtectionOut) public onlyEmergencyAuthorized {
+    function updateSlippageProtectionOut(uint256 _slippageProtectionOut) public onlyVaultManagers {
         slippageProtectionOut = _slippageProtectionOut;
     }
     
@@ -124,6 +127,15 @@ contract Strategy is BaseStrategy {
             }
             wantBal = wantBalance();
 
+            //net off profit and loss
+            if(_profit >= _loss){
+                _profit = _profit - _loss;
+                _loss = 0;
+            }else{
+                _profit = 0;
+                _loss = _loss - _profit;
+            }
+
             //profit + _debtOutstanding must be <= wantbalance. Prioritise profit first
             if(wantBal < _profit){
                 _profit = wantBal;
@@ -163,11 +175,11 @@ contract Strategy is BaseStrategy {
         weth.withdraw(_amount);
 
         //test if we should buy instead of mint
-        uint256 out = StableSwapSTETH.get_dy(0,1,_amount);
+        uint256 out = StableSwapSTETH.get_dy(WETHID, STETHID, _amount);
         if(out < _amount){
            stETH.submit{value: _amount}(referal);
         }else{        
-            StableSwapSTETH.exchange{value: _amount}(0,1, _amount, _amount);
+            StableSwapSTETH.exchange{value: _amount}(WETHID, STETHID, _amount, _amount);
         }
 
         return stethBalance().sub(before);
@@ -177,7 +189,7 @@ contract Strategy is BaseStrategy {
         uint256 before = wantBalance();
 
         uint256 slippageAllowance = _amount.mul(DENOMINATOR.sub(slippageProtectionOut)).div(DENOMINATOR);
-        StableSwapSTETH.exchange(1,0, _amount,slippageAllowance);
+        StableSwapSTETH.exchange(STETHID, WETHID, _amount,slippageAllowance);
 
         weth.deposit{value: address(this).balance}();
 
