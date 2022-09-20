@@ -27,3 +27,11 @@ def test_migrate_live(currency,live_strategy, Strategy, chain,live_vault, whale,
 
     t1 = strategy.harvest({'from': gov})
     print(t1.events['Harvested'])
+
+    strategy.updatePeg(0, {'from': gov})
+    strategy.updateMaxSingleTrade(2**256-1, {'from': gov})
+    live_vault.updateStrategyDebtRatio(strategy, 0, {'from': gov})
+    t1 = strategy.harvest({'from': gov})
+    print(t1.events['Harvested'])
+    assert strategy.wantBalance() <= 1
+    assert strategy.stethBalance() <= 1
