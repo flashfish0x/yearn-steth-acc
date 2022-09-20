@@ -97,9 +97,7 @@ def keeper(accounts):
 
 @pytest.fixture
 def live_strategy(Strategy):
-    #strategy = Strategy.at('0xCa8C5e51e235EF1018B2488e4e78e9205064D736')
-    #strategy = Strategy.at('0x997a498E72d4225F0D78540B6ffAbb6cA869edc9')
-    strategy = Strategy.at('0xebfC9451d19E8dbf36AAf547855b4dC789CA793C')
+    strategy = Strategy.at('0x0967aFe627C732d152e3dFCAdd6f9DBfecDE18c3')
 
     yield strategy
 

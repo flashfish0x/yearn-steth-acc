@@ -1,4 +1,5 @@
 from itertools import count
+from threading import activeCount
 from brownie import Wei, reverts
 import eth_abi
 from brownie.convert import to_bytes
@@ -12,6 +13,17 @@ import brownie
 #           - change in loading (from low to high and high to low)
 #           - strategy operation at different loading levels (anticipated and "extreme")
 
-def test_opsss_lvie(currency,live_strategy, chain,live_vault, whale,gov, samdev,strategist, interface):
-    strategy = live_strategy
+def test_migrate_live(currency,live_strategy, Strategy, chain,live_vault, whale, samdev,strategist, interface, accounts):
     
+    gov = accounts.at(live_vault.governance(), force='True')
+    before = live_strategy.estimatedTotalAssets()
+    strategy = strategist.deploy(Strategy, live_vault)
+
+    live_vault.migrateStrategy(live_strategy, strategy, {'from': gov})
+
+    after = strategy.estimatedTotalAssets()
+
+    assert after == (before * (10_000 - 100)) // 10_000 -1
+
+    t1 = strategy.harvest({'from': gov})
+    print(t1.events['Harvested'])

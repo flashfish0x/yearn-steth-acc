@@ -39,6 +39,10 @@ contract Strategy is BaseStrategy {
     uint256 public constant DENOMINATOR = 10_000;
     uint256 public slippageProtectionOut;// = 50; //out of 10000. 50 = 0.5%
 
+    bool public reportLoss = false;
+
+    uint256 public peg = 100; // 100 = 1%
+
     int128 private constant WETHID = 0;
     int128 private constant STETHID = 1;
 
@@ -52,7 +56,7 @@ contract Strategy is BaseStrategy {
         stETH.approve(address(StableSwapSTETH), type(uint256).max);
         
         maxSingleTrade = 1_000 * 1e18;
-        slippageProtectionOut = 50;
+        slippageProtectionOut = 500;
     }
 
 
@@ -64,6 +68,12 @@ contract Strategy is BaseStrategy {
     }
     function updateMaxSingleTrade(uint256 _maxSingleTrade) public onlyVaultManagers {
         maxSingleTrade = _maxSingleTrade;
+    }
+    function updatePeg(uint256 _peg) public onlyVaultManagers {
+        peg = _peg;
+    }
+    function updateReportLoss(bool _reportLoss) public onlyVaultManagers {
+        reportLoss = _reportLoss;
     }
     function updateSlippageProtectionOut(uint256 _slippageProtectionOut) public onlyVaultManagers {
         slippageProtectionOut = _slippageProtectionOut;
@@ -86,14 +96,10 @@ contract Strategy is BaseStrategy {
         return "StrategystETHAccumulator";
     }
 
-    // We are purposely treating stETH and ETH as being equivalent. 
-    // This is for a few reasons. The main one is that we do not have a good way to value stETH at any current time without creating exploit routes.
-    // Currently you can mint eth for steth but can't burn steth for eth so need to sell. Once eth 2.0 is merged you will be able to burn 1-1 as well.
-    // The main downside here is that we will noramlly overvalue our position as we expect stETH to trade slightly below peg.
-    // That means we will earn profit on deposits and take losses on withdrawals.
+    // We hard code a peg here. This is so that we can build up a reserve of profit to cover peg volatility if we are forced to delever
     // This may sound scary but it is the equivalent of using virtualprice in a curve lp. As we have seen from many exploits, virtual pricing is safer than touch pricing.
     function estimatedTotalAssets() public override view returns (uint256) {
-        return stethBalance().add(wantBalance());
+        return stethBalance().mul(DENOMINATOR.sub(peg)).div(DENOMINATOR).add(wantBalance());
     }
 
     function wantBalance() public view returns (uint256){
@@ -113,8 +119,7 @@ contract Strategy is BaseStrategy {
         )
     {
         uint256 wantBal = wantBalance();
-        uint256 stethBal = stethBalance();
-        uint256 totalAssets = wantBal.add(stethBal);
+        uint256 totalAssets = estimatedTotalAssets();
 
         uint256 debt = vault.strategies(address(this)).totalDebt;
 
@@ -152,7 +157,10 @@ contract Strategy is BaseStrategy {
             }
 
         }else{
-            _loss = debt.sub(totalAssets);
+            if(reportLoss){
+                _loss = debt.sub(totalAssets);
+            }
+            
         }
         
     }
