@@ -33,8 +33,7 @@ def steth_holder(accounts, steth):
     #big binance7 wallet
     #acc = accounts.at('0xBE0eB53F46cd790Cd13851d5EFf43D12404d33E8', force=True)
 
-    #EthLidoPCVDeposit
-    acc = accounts.at('0xAc38Ee05C0204A1E119C625d0a560D6731478880', force=True)
+    acc = accounts.at('0x41318419CFa25396b47A94896FfA2C77c6434040', force=True)
 
     assert steth.balanceOf(acc)  > 0
     

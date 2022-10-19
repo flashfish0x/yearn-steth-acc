@@ -40,6 +40,7 @@ contract Strategy is BaseStrategy {
     uint256 public slippageProtectionOut;// = 50; //out of 10000. 50 = 0.5%
 
     bool public reportLoss = false;
+    bool public dontInvest = false;
 
     uint256 public peg = 100; // 100 = 1%
 
@@ -63,26 +64,29 @@ contract Strategy is BaseStrategy {
     //we get eth
     receive() external payable {}
 
-    function updateReferal(address _referal) public onlyEmergencyAuthorized {
+    function updateReferal(address _referal) external onlyEmergencyAuthorized {
         referal = _referal;
     }
-    function updateMaxSingleTrade(uint256 _maxSingleTrade) public onlyVaultManagers {
+    function updateMaxSingleTrade(uint256 _maxSingleTrade) external onlyVaultManagers {
         maxSingleTrade = _maxSingleTrade;
     }
-    function updatePeg(uint256 _peg) public onlyVaultManagers {
+    function updatePeg(uint256 _peg) external onlyVaultManagers {
+        require(_peg <= 1_000); //limit peg to max 10%
         peg = _peg;
     }
-    function updateReportLoss(bool _reportLoss) public onlyVaultManagers {
+    function updateReportLoss(bool _reportLoss) external onlyVaultManagers {
         reportLoss = _reportLoss;
     }
-    function updateSlippageProtectionOut(uint256 _slippageProtectionOut) public onlyVaultManagers {
+    function updateDontInvest(bool _dontInvest) external onlyVaultManagers {
+        dontInvest = _dontInvest;
+    }
+    function updateSlippageProtectionOut(uint256 _slippageProtectionOut) external onlyVaultManagers {
+        require(_slippageProtectionOut <= 10_000);
         slippageProtectionOut = _slippageProtectionOut;
     }
     
     function invest(uint256 _amount) external onlyEmergencyAuthorized{
-        require(wantBalance() >= _amount);
-        uint256 realInvest = Math.min(maxSingleTrade, _amount);
-        _invest(realInvest);
+        _invest(_amount);
     }
 
     //should never have stuck eth but just incase
@@ -93,7 +97,7 @@ contract Strategy is BaseStrategy {
 
     function name() external override view returns (string memory) {
         // Add your own name here, suggestion e.g. "StrategyCreamYFI"
-        return "StrategystETHAccumulator";
+        return "StrategystETHAccumulator_v2";
     }
 
     // We hard code a peg here. This is so that we can build up a reserve of profit to cover peg volatility if we are forced to delever
@@ -174,16 +178,19 @@ contract Strategy is BaseStrategy {
     }
 
     function adjustPosition(uint256 _debtOutstanding) internal override {
-
-        uint256 toInvest = wantBalance();
-        if(toInvest > 0){
-            uint256 realInvest = Math.min(maxSingleTrade, toInvest);
-            _invest(realInvest);
-
+        
+        if(dontInvest){
+            return;
         }
+        _invest(wantBalance());
     }
 
     function _invest(uint256 _amount) internal returns (uint256){
+        if(_amount == 0){
+            return 0;
+        }
+
+        _amount = Math.min(maxSingleTrade, _amount);
         uint256 before = stethBalance();
 
         weth.withdraw(_amount);
@@ -258,10 +265,5 @@ contract Strategy is BaseStrategy {
         view
         returns (address[] memory)
     {
-
-        address[] memory protected = new address[](1);
-          protected[0] = address(stETH);
-    
-          return protected;
     }
 }
