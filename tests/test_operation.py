@@ -58,7 +58,7 @@ def test_profitable_harvest(currency,strategy,Contract, chain,vault, steth, whal
     strategy.setDoHealthCheck(False, {'from': gov})
     strategy.harvest({'from': strategist})
 
-    assert steth.balanceOf(strategy) <= 1 #no balance left
+    assert steth.balanceOf(strategy) <= 2 #no balance left
     assert weth.balanceOf(vault) >= (rewards_amount + whale_deposit) * 0.995 # 0.5% max slippage
     assert strategy.balance() == 0
 

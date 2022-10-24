@@ -53,6 +53,7 @@ contract Strategy is BaseStrategy {
         maxReportDelay = 43200;
         profitFactor = 2000;
         debtThreshold = 400*1e18;
+        healthCheck = 0xDDCea799fF1699e98EDF118e0629A974Df7DF012; //hardcode healthcheck
 
         stETH.approve(address(StableSwapSTETH), type(uint256).max);
         
@@ -104,6 +105,10 @@ contract Strategy is BaseStrategy {
     // This may sound scary but it is the equivalent of using virtualprice in a curve lp. As we have seen from many exploits, virtual pricing is safer than touch pricing.
     function estimatedTotalAssets() public override view returns (uint256) {
         return stethBalance().mul(DENOMINATOR.sub(peg)).div(DENOMINATOR).add(wantBalance());
+    }
+
+    function estimatedPotentialTotalAssets() public view returns (uint256) {
+        return stethBalance().add(wantBalance());
     }
 
     function wantBalance() public view returns (uint256){
