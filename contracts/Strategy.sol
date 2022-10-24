@@ -39,6 +39,11 @@ contract Strategy is BaseStrategy {
     uint256 public constant DENOMINATOR = 10_000;
     uint256 public slippageProtectionOut;// = 50; //out of 10000. 50 = 0.5%
 
+    bool public reportLoss = false;
+    bool public dontInvest = false;
+
+    uint256 public peg = 100; // 100 = 1%
+
     int128 private constant WETHID = 0;
     int128 private constant STETHID = 1;
 
@@ -48,31 +53,41 @@ contract Strategy is BaseStrategy {
         maxReportDelay = 43200;
         profitFactor = 2000;
         debtThreshold = 400*1e18;
+        healthCheck = 0xDDCea799fF1699e98EDF118e0629A974Df7DF012; //hardcode healthcheck
 
         stETH.approve(address(StableSwapSTETH), type(uint256).max);
         
         maxSingleTrade = 1_000 * 1e18;
-        slippageProtectionOut = 50;
+        slippageProtectionOut = 500;
     }
 
 
     //we get eth
     receive() external payable {}
 
-    function updateReferal(address _referal) public onlyEmergencyAuthorized {
+    function updateReferal(address _referal) external onlyEmergencyAuthorized {
         referal = _referal;
     }
-    function updateMaxSingleTrade(uint256 _maxSingleTrade) public onlyVaultManagers {
+    function updateMaxSingleTrade(uint256 _maxSingleTrade) external onlyVaultManagers {
         maxSingleTrade = _maxSingleTrade;
     }
-    function updateSlippageProtectionOut(uint256 _slippageProtectionOut) public onlyVaultManagers {
+    function updatePeg(uint256 _peg) external onlyVaultManagers {
+        require(_peg <= 1_000); //limit peg to max 10%
+        peg = _peg;
+    }
+    function updateReportLoss(bool _reportLoss) external onlyVaultManagers {
+        reportLoss = _reportLoss;
+    }
+    function updateDontInvest(bool _dontInvest) external onlyVaultManagers {
+        dontInvest = _dontInvest;
+    }
+    function updateSlippageProtectionOut(uint256 _slippageProtectionOut) external onlyVaultManagers {
+        require(_slippageProtectionOut <= 10_000);
         slippageProtectionOut = _slippageProtectionOut;
     }
     
     function invest(uint256 _amount) external onlyEmergencyAuthorized{
-        require(wantBalance() >= _amount);
-        uint256 realInvest = Math.min(maxSingleTrade, _amount);
-        _invest(realInvest);
+        _invest(_amount);
     }
 
     //should never have stuck eth but just incase
@@ -83,16 +98,16 @@ contract Strategy is BaseStrategy {
 
     function name() external override view returns (string memory) {
         // Add your own name here, suggestion e.g. "StrategyCreamYFI"
-        return "StrategystETHAccumulator";
+        return "StrategystETHAccumulator_v2";
     }
 
-    // We are purposely treating stETH and ETH as being equivalent. 
-    // This is for a few reasons. The main one is that we do not have a good way to value stETH at any current time without creating exploit routes.
-    // Currently you can mint eth for steth but can't burn steth for eth so need to sell. Once eth 2.0 is merged you will be able to burn 1-1 as well.
-    // The main downside here is that we will noramlly overvalue our position as we expect stETH to trade slightly below peg.
-    // That means we will earn profit on deposits and take losses on withdrawals.
+    // We hard code a peg here. This is so that we can build up a reserve of profit to cover peg volatility if we are forced to delever
     // This may sound scary but it is the equivalent of using virtualprice in a curve lp. As we have seen from many exploits, virtual pricing is safer than touch pricing.
     function estimatedTotalAssets() public override view returns (uint256) {
+        return stethBalance().mul(DENOMINATOR.sub(peg)).div(DENOMINATOR).add(wantBalance());
+    }
+
+    function estimatedPotentialTotalAssets() public view returns (uint256) {
         return stethBalance().add(wantBalance());
     }
 
@@ -113,8 +128,7 @@ contract Strategy is BaseStrategy {
         )
     {
         uint256 wantBal = wantBalance();
-        uint256 stethBal = stethBalance();
-        uint256 totalAssets = wantBal.add(stethBal);
+        uint256 totalAssets = estimatedTotalAssets();
 
         uint256 debt = vault.strategies(address(this)).totalDebt;
 
@@ -152,7 +166,10 @@ contract Strategy is BaseStrategy {
             }
 
         }else{
-            _loss = debt.sub(totalAssets);
+            if(reportLoss){
+                _loss = debt.sub(totalAssets);
+            }
+            
         }
         
     }
@@ -166,16 +183,19 @@ contract Strategy is BaseStrategy {
     }
 
     function adjustPosition(uint256 _debtOutstanding) internal override {
-
-        uint256 toInvest = wantBalance();
-        if(toInvest > 0){
-            uint256 realInvest = Math.min(maxSingleTrade, toInvest);
-            _invest(realInvest);
-
+        
+        if(dontInvest){
+            return;
         }
+        _invest(wantBalance());
     }
 
     function _invest(uint256 _amount) internal returns (uint256){
+        if(_amount == 0){
+            return 0;
+        }
+
+        _amount = Math.min(maxSingleTrade, _amount);
         uint256 before = stethBalance();
 
         weth.withdraw(_amount);
@@ -250,10 +270,5 @@ contract Strategy is BaseStrategy {
         view
         returns (address[] memory)
     {
-
-        address[] memory protected = new address[](1);
-          protected[0] = address(stETH);
-    
-          return protected;
     }
 }

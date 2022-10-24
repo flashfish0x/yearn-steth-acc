@@ -33,8 +33,7 @@ def steth_holder(accounts, steth):
     #big binance7 wallet
     #acc = accounts.at('0xBE0eB53F46cd790Cd13851d5EFf43D12404d33E8', force=True)
 
-    #EthLidoPCVDeposit
-    acc = accounts.at('0xAc38Ee05C0204A1E119C625d0a560D6731478880', force=True)
+    acc = accounts.at('0x41318419CFa25396b47A94896FfA2C77c6434040', force=True)
 
     assert steth.balanceOf(acc)  > 0
     
@@ -97,9 +96,7 @@ def keeper(accounts):
 
 @pytest.fixture
 def live_strategy(Strategy):
-    #strategy = Strategy.at('0xCa8C5e51e235EF1018B2488e4e78e9205064D736')
-    #strategy = Strategy.at('0x997a498E72d4225F0D78540B6ffAbb6cA869edc9')
-    strategy = Strategy.at('0xebfC9451d19E8dbf36AAf547855b4dC789CA793C')
+    strategy = Strategy.at('0x0967aFe627C732d152e3dFCAdd6f9DBfecDE18c3')
 
     yield strategy
 
